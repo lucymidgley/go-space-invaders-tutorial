@@ -95,14 +95,57 @@ func (m *Meteor) Update() {
 
 var PlayerSprite = mustLoadImage("assets/playerShip1_blue.png")
 
-type Player struct {
+var BulletSprite = mustLoadImage("assets/laserBlue02.png")
+
+type Bullet struct {
 	position Vector
 	rotation float64
 	sprite   *ebiten.Image
 }
 
-func NewPlayer() *Player {
+func NewBullet(position Vector, rotation float64) *Bullet {
+	sprite := BulletSprite
+
+	return &Bullet{
+		position: position,
+		sprite:   sprite,
+		rotation: rotation,
+	}
+}
+
+func (b *Bullet) Draw(screen *ebiten.Image) {
+	bounds := b.sprite.Bounds()
+	halfW := float64(bounds.Dx()) / 2
+	halfH := float64(bounds.Dy()) / 2
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Translate(-halfW, -halfH)
+	op.GeoM.Rotate(b.rotation)
+	op.GeoM.Translate(halfW, halfH)
+
+	op.GeoM.Translate(b.position.X, b.position.Y)
+
+	screen.DrawImage(b.sprite, op)
+}
+
+func (b *Bullet) Update() {
+	speed := 350.0 / float64(ebiten.TPS())
+
+	b.position.X += math.Sin(b.rotation) * speed
+	b.position.Y += math.Cos(b.rotation) * -speed
+}
+
+type Player struct {
+	game          *Game
+	position      Vector
+	rotation      float64
+	sprite        *ebiten.Image
+	shootCooldown *components.Timer
+}
+
+func NewPlayer(game *Game) *Player {
 	sprite := PlayerSprite
+	shootCooldown := components.NewTimer(time.Millisecond * 1000)
 
 	bounds := sprite.Bounds()
 	halfW := float64(bounds.Dx()) / 2
@@ -113,8 +156,10 @@ func NewPlayer() *Player {
 		Y: ScreenHeight/2 - halfH,
 	}
 	return &Player{
-		position: pos,
-		sprite:   sprite,
+		game:          game,
+		position:      pos,
+		sprite:        sprite,
+		shootCooldown: shootCooldown,
 	}
 }
 
@@ -126,6 +171,24 @@ func (p *Player) Update() {
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyRight) {
 		p.rotation += speed
+	}
+
+	p.shootCooldown.Update()
+	if p.shootCooldown.IsReady() && ebiten.IsKeyPressed(ebiten.KeySpace) {
+		p.shootCooldown.Reset()
+
+		bulletSpawnOffset := 50.0
+
+		bounds := p.sprite.Bounds()
+		halfW := float64(bounds.Dx()) / 2
+		halfH := float64(bounds.Dy()) / 2
+
+		spawnPos := Vector{
+			X: p.position.X + halfW + math.Sin((p.rotation)*bulletSpawnOffset),
+			Y: p.position.Y + halfH + math.Cos((p.rotation)*-bulletSpawnOffset),
+		}
+		bullet := NewBullet(spawnPos, p.rotation)
+		p.game.AddBullet(bullet)
 	}
 }
 
@@ -160,6 +223,7 @@ type Game struct {
 	player           *Player
 	meteorSpawnTimer *components.Timer
 	meteors          []*Meteor
+	bullets          []*Bullet
 }
 
 func (g *Game) Update() error {
@@ -177,6 +241,10 @@ func (g *Game) Update() error {
 		m.Update()
 	}
 
+	for _, b := range g.bullets {
+		b.Update()
+	}
+
 	return nil
 }
 
@@ -186,6 +254,14 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for _, m := range g.meteors {
 		m.Draw(screen)
 	}
+
+	for _, b := range g.bullets {
+		b.Draw(screen)
+	}
+}
+
+func (g *Game) AddBullet(b *Bullet) {
+	g.bullets = append(g.bullets, b)
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
@@ -221,11 +297,17 @@ func mustLoadImages(path string) []*ebiten.Image {
 	return images
 }
 
-func main() {
+func NewGame() *Game {
 	g := &Game{
-		player:           NewPlayer(),
-		meteorSpawnTimer: components.NewTimer(time.Millisecond * 500),
+		meteorSpawnTimer: components.NewTimer(time.Second * 1),
 	}
+	g.player = NewPlayer(g)
+
+	return g
+}
+
+func main() {
+	g := NewGame()
 
 	err := ebiten.RunGame(g)
 	if err != nil {
