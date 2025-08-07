@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"math"
 	"math/rand"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -157,7 +158,7 @@ func (v Vector) Normalize() Vector {
 
 type Game struct {
 	player           *Player
-	meteorSpawnTimer components.Timer
+	meteorSpawnTimer *components.Timer
 	meteors          []*Meteor
 }
 
@@ -222,7 +223,8 @@ func mustLoadImages(path string) []*ebiten.Image {
 
 func main() {
 	g := &Game{
-		player: NewPlayer(),
+		player:           NewPlayer(),
+		meteorSpawnTimer: components.NewTimer(time.Millisecond * 500),
 	}
 
 	err := ebiten.RunGame(g)
