@@ -2,8 +2,10 @@ package main
 
 import (
 	"embed"
+	"fmt"
 	"game/components"
 	"image"
+	"image/color"
 	_ "image/png"
 	"io/fs"
 	"math"
@@ -11,6 +13,9 @@ import (
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
 )
 
 const (
@@ -20,6 +25,26 @@ const (
 
 //go:embed assets/*
 var assets embed.FS
+
+var ScoreFont = mustLoadFont("assets/font.ttf")
+
+func mustLoadFont(name string) font.Face {
+	f, err := assets.ReadFile(name)
+	if err != nil {
+		panic(err)
+	}
+
+	tt, err := opentype.Parse(f)
+	if err != nil {
+		panic(err)
+	}
+
+	face, err := opentype.NewFace(tt, &opentype.FaceOptions{Size: 48, DPI: 72, Hinting: font.HintingVertical})
+	if err != nil {
+		panic(err)
+	}
+	return face
+}
 
 type Rect struct {
 	X      float64
@@ -268,6 +293,7 @@ type Game struct {
 	meteorSpawnTimer *components.Timer
 	meteors          []*Meteor
 	bullets          []*Bullet
+	score            int
 }
 
 func (g *Game) Update() error {
@@ -294,6 +320,7 @@ func (g *Game) Update() error {
 			if m.Collider().Intersects(b.Collider()) {
 				g.meteors = append(g.meteors[:i], g.meteors[i+1:]...)
 				g.bullets = append(g.bullets[:j], g.bullets[j+1:]...)
+				g.score++
 			}
 		}
 	}
@@ -317,6 +344,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for _, b := range g.bullets {
 		b.Draw(screen)
 	}
+	text.Draw(screen, fmt.Sprintf("%06d", g.score), ScoreFont, ScreenWidth/2-100, 50, color.White)
 }
 
 func (g *Game) AddBullet(b *Bullet) {
@@ -326,6 +354,7 @@ func (g *Game) Reset() {
 	g.player = NewPlayer(g)
 	g.meteors = nil
 	g.bullets = nil
+	g.score = 0
 }
 
 func (g *Game) Layout(outsideWidth, outsideHeight int) (screenWidth, screenHeight int) {
