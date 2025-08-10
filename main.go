@@ -89,7 +89,7 @@ func NewMeteor() *Meteor {
 
 	pos := Vector{
 		X: target.X + math.Cos(angle)*r,
-		Y: target.X + math.Sin(angle)*r,
+		Y: target.Y + math.Sin(angle)*r,
 	}
 
 	velocity := 0.25 + rand.Float64()*1.5
@@ -109,7 +109,7 @@ func NewMeteor() *Meteor {
 	rotationSpeed := -0.02 + rand.Float64()*0.04
 
 	return &Meteor{
-		position:      Vector{},
+		position:      pos,
 		sprite:        sprite,
 		movement:      movement,
 		rotationSpeed: rotationSpeed,
